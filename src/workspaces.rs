@@ -51,8 +51,10 @@ impl WorkspaceState {
             .arg("activewindow")
             .output()
             .expect("Couldn't get current active window.");
-        let data: ActiveWindow = serde_json::from_slice(&data.stdout)
-            .expect("Err converting to json.");
+        let data: ActiveWindow = match serde_json::from_slice(&data.stdout) {
+            Ok(value) => value,
+            Err(_) => ActiveWindow { workspace: InnerActiveWindow { id: 1 }, title: String::from("eww loading...") }
+        };
         WorkspaceState { active_workspace: data.workspace.id, wss: map.to_owned(), ws_names: map.into_keys().collect()}
     }
 
