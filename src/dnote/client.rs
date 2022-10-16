@@ -1,10 +1,7 @@
-//! # DBus interface proxy for: `org.freedesktop.Notifications`
-
-use std::collections::HashMap;
-
 use zbus::dbus_proxy;
 use zbus::Connection;
 
+// DBus interface proxy for: `org.freedesktop.Notifications`
 #[dbus_proxy(interface = "org.freedesktop.Notifications")]
 trait Notifications {
     /// CloseNotification method
