@@ -1,9 +1,10 @@
-use clap::{Parser, Subcommand, ValueEnum};
+extern crate nasty;
 
-mod workspaces;
+use clap::{Parser, Subcommand, ValueEnum};
+use nasty::{notifications, workspaces};
 
 /// A listener cli designed to be used with EWW widgets.
-#[derive(Debug, Parser)] 
+#[derive(Debug, Parser)]
 #[command(name = "nasty")]
 struct Cli {
     #[command(subcommand)]
@@ -15,9 +16,6 @@ enum Commands {
     /// Listens on the org.freedesktop.Notifications Dbus
     #[command()]
     Notification {
-        /// The bus to connect to.
-        #[arg(default_value="org.freedesktop.Notifications")]
-        bus: String,
     },
     /// Listens to workspace changes
     #[command()]
@@ -36,7 +34,9 @@ enum WindowManagers {
 fn main() {
     let args = Cli::parse();
     match args.command {
-        Commands::Notification { bus } => println!("Notifications WIP! {bus}"),
-        Commands::Workspaces { wm } => match wm {WindowManagers::Hyperland => workspaces::hyperland_wm()},
-    } 
+        Commands::Notification {} => notifications::send_test_note(),
+        Commands::Workspaces { wm } => match wm {
+            WindowManagers::Hyperland => workspaces::hyperland_wm(),
+        },
+    }
 }
