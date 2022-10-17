@@ -1,3 +1,3 @@
-pub mod workspaces;
-pub mod notifications;
 pub mod dnote;
+pub mod notifications;
+pub mod workspaces;

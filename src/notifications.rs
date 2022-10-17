@@ -11,11 +11,12 @@ pub fn send_test_note() {
         "nasty",
         0,
         "an icon",
-        "A Test", "This is a test notification from nasty.",
+        "A Test",
+        "This is a test notification from nasty.",
         &[],
         HashMap::new(),
         5000,
-        );
+    );
     rt.block_on(future);
 }
 pub fn start_server() {

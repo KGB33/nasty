@@ -15,8 +15,7 @@ struct Cli {
 enum Commands {
     /// Listens on the org.freedesktop.Notifications Dbus
     #[command()]
-    Notification {
-    },
+    Notification {},
     /// Listens to workspace changes
     #[command()]
     Workspaces {
