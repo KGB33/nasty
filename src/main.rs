@@ -34,7 +34,8 @@ enum WindowManagers {
 fn main() {
     let args = Cli::parse();
     match args.command {
-        Commands::Notification {} => notifications::send_test_note(),
+        //Commands::Notification {} => notifications::send_test_note(),
+        Commands::Notification {} => notifications::start_server(),
         Commands::Workspaces { wm } => match wm {
             WindowManagers::Hyperland => workspaces::hyperland_wm(),
         },
