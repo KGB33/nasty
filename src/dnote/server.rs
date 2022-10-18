@@ -1,12 +1,64 @@
-use zbus::{dbus_interface, Connection};
+use std::collections::HashMap;
 
-struct Notes;
+use serde::{Deserialize, Serialize};
+use zbus::{
+    dbus_interface,
+    zvariant::{DeserializeDict, SerializeDict, Type},
+    Connection,
+};
+
+#[derive(Serialize, Deserialize)]
+struct Notification {
+    app_name: String,
+    app_icon: String,
+    summary: String,
+    body: String,
+    actions: Vec<String>,
+    hints: Hints,
+}
+
+#[derive(DeserializeDict, SerializeDict, Type, Debug)]
+// `Type` treats `dict` is an alias for `a{sv}`.
+#[zvariant(signature = "dict")]
+struct Hints {
+    #[zvariant(rename = "action-icons")]
+    action_icons: Option<bool>,
+    categary: Option<String>,
+    #[zvariant(rename = "desktop-entry")]
+    desktop_entry: Option<String>,
+    //image_data: iiibiiay // not implementing this
+    #[zvariant(rename = "image-path")]
+    image_path: Option<String>,
+    resident: Option<bool>,
+    transient: Option<bool>,
+    urgency: Option<u8>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Notes {
+    notifications: HashMap<u32, Notification>,
+    last_id: u32,
+}
+
+impl Notes {
+    fn new() -> Notes {
+        Notes {
+            notifications: HashMap::new(),
+            last_id: 1,
+        }
+    }
+    fn next_id(&mut self) -> u32 {
+        self.last_id += 1;
+        return self.last_id;
+    }
+    fn on_change(&self) {
+        let out = serde_json::to_string(self).expect("");
+        println!("{}", out);
+    }
+}
 
 #[dbus_interface(name = "org.freedesktop.Notifications")]
 impl Notes {
-    async fn say_hello(&self, name: &str) -> String {
-        format!("Hello {}!", name)
-    }
     // CloseNotification method
     //async fn close_notification(&self, id: u32) -> zbus::Result<()>;
 
@@ -34,28 +86,32 @@ impl Notes {
 
     // Notify method
     async fn notify(
-        &self,
-        app_name: &str,
+        &mut self,
+        app_name: String,
         replaces_id: u32,
-        app_icon: &str,
-        summary: &str,
-        body: &str,
-        actions: Vec<&str>,
-        hints: std::collections::HashMap<&str, zbus::zvariant::Value<'_>>,
+        app_icon: String,
+        summary: String,
+        body: String,
+        actions: Vec<String>,
+        hints: Hints,
         expire_timeout: i32,
     ) -> u32 {
-        println!(
-            "notify called:
-                 app_name: {app_name} 
-                 replaces_id: {replaces_id}
-                 app_icon: {app_icon}
-                 summary: {summary}
-                 body: {body}
-                 actions: {actions:?}
-                 hints: {hints:?}
-                 expire_timeout: {expire_timeout}
-                 "
+        let mut replaces_id = replaces_id;
+        if replaces_id == 0 {
+            replaces_id = self.next_id();
+        }
+        self.notifications.insert(
+            replaces_id,
+            Notification {
+                app_name,
+                app_icon,
+                summary,
+                body,
+                actions,
+                hints,
+            },
         );
+        self.on_change();
         return replaces_id;
     }
 
@@ -73,7 +129,7 @@ pub async fn serve() {
     // setup the server
     connection
         .object_server()
-        .at("/org/freedesktop/Notifications", Notes)
+        .at("/org/freedesktop/Notifications", Notes::new())
         .await
         .expect("");
     // before requesting the name
