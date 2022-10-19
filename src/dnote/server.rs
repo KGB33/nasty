@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use zbus::{
-    dbus_interface, dbus_proxy,
+    dbus_interface,
     zvariant::{DeserializeDict, SerializeDict, Type},
     Connection,
 };
@@ -74,6 +74,7 @@ impl Notes {
     // CloseNotification method
     async fn close_notification(&mut self, id: u32) {
         self.notifications.remove_entry(&id);
+        self.on_change();
     }
 
     // GetCapabilities method
@@ -108,7 +109,7 @@ impl Notes {
         body: String,
         actions: Vec<String>,
         hints: Hints,
-        expire_timeout: i32,
+        _expire_timeout: i32, // TODO
     ) -> u32 {
         let mut replaces_id = replaces_id;
         if replaces_id == 0 {
@@ -136,6 +137,7 @@ impl Notes {
     // NotificationClosed signal
     async fn notification_closed(&mut self, id: u32, _reason: u32) {
         self.notifications.remove(&id);
+        self.on_change();
     }
 }
 

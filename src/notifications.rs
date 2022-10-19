@@ -2,12 +2,11 @@ use std::collections::HashMap;
 
 use tokio;
 
-use crate::dnote::client::notify;
-use crate::dnote::server::serve;
+use crate::dnote::{client, server};
 
 pub fn send_test_note() {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let future = notify(
+    let future = client::notify(
         "nasty",
         0,
         "an icon",
@@ -19,8 +18,15 @@ pub fn send_test_note() {
     );
     rt.block_on(future);
 }
+
+pub fn close_notification(id: u32) {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let future = client::close_notification(id);
+    rt.block_on(future);
+}
+
 pub fn start_server() {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let future = serve();
+    let future = server::serve();
     rt.block_on(future);
 }

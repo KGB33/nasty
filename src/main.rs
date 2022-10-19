@@ -15,7 +15,13 @@ struct Cli {
 enum Commands {
     /// Listens on the org.freedesktop.Notifications Dbus
     #[command()]
-    Notification {},
+    Notifications {
+        #[arg(short, long, default_value_t = false)]
+        server: bool,
+        #[arg(short, long, default_value_t = 0)]
+        close: u32,
+    },
+
     /// Listens to workspace changes
     #[command()]
     Workspaces {
@@ -34,7 +40,10 @@ fn main() {
     let args = Cli::parse();
     match args.command {
         //Commands::Notification {} => notifications::send_test_note(),
-        Commands::Notification {} => notifications::start_server(),
+        Commands::Notifications { server, close } => match (server, close) {
+            (true, _) => notifications::start_server(),
+            (false, close) => notifications::close_notification(close),
+        },
         Commands::Workspaces { wm } => match wm {
             WindowManagers::Hyperland => workspaces::hyperland_wm(),
         },

@@ -62,3 +62,10 @@ pub async fn notify(
         .expect("");
     dbg!(reply);
 }
+
+pub async fn close_notification(id: u32) {
+    let connection = Connection::session().await.expect("");
+    let note = NotificationsProxy::new(&connection).await.expect("");
+    let reply = note.close_notification(id).await.expect("");
+    dbg!(reply);
+}
