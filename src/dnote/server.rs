@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use zbus::{
-    dbus_interface,
+    dbus_interface, dbus_proxy,
     zvariant::{DeserializeDict, SerializeDict, Type},
     Connection,
 };
@@ -37,6 +37,7 @@ struct Hints {
 #[derive(Serialize, Deserialize)]
 struct Notes {
     notifications: HashMap<u32, Notification>,
+    priority: Vec<u32>,
     last_id: u32,
 }
 
@@ -44,6 +45,7 @@ impl Notes {
     fn new() -> Notes {
         Notes {
             notifications: HashMap::new(),
+            priority: Vec::new(),
             last_id: 1,
         }
     }
@@ -51,16 +53,28 @@ impl Notes {
         self.last_id += 1;
         return self.last_id;
     }
-    fn on_change(&self) {
+    fn on_change(&mut self) {
+        self.update_urgency();
         let out = serde_json::to_string(self).expect("");
         println!("{}", out);
+    }
+    fn update_urgency(&mut self) {
+        self.priority = self.notifications.keys().copied().collect();
+        self.priority.sort_by_key(|k| {
+            (
+                10 - self.notifications.get(k).unwrap().hints.urgency.unwrap(),
+                k.clone(),
+            )
+        });
     }
 }
 
 #[dbus_interface(name = "org.freedesktop.Notifications")]
 impl Notes {
     // CloseNotification method
-    //async fn close_notification(&self, id: u32) -> zbus::Result<()>;
+    async fn close_notification(&mut self, id: u32) {
+        self.notifications.remove_entry(&id);
+    }
 
     // GetCapabilities method
     async fn get_capabilities(&self) -> zbus::fdo::Result<Vec<String>> {
@@ -120,8 +134,9 @@ impl Notes {
     //fn action_invoked(&self, id: u32, action_key: &str) -> zbus::Result<()>;
 
     // NotificationClosed signal
-    //#[dbus_proxy(signal)]
-    //fn notification_closed(&self, id: u32, reason: u32) -> zbus::Result<()>;
+    async fn notification_closed(&mut self, id: u32, _reason: u32) {
+        self.notifications.remove(&id);
+    }
 }
 
 pub async fn serve() {
