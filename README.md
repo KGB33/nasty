@@ -26,6 +26,7 @@ Stuff I'll maybe eventually get to (PRs welcome).
   - SwayWM Workspace support
   - Send notification command 
   - Notification "expiration timeout" support.
+  - AUR package & CI/CD
 
 
 
