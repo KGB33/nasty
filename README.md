@@ -8,4 +8,24 @@ Eww integration examples can be found in my
 
 See `nasty --help` for cli usage.
 
+# Features
+## Freedesktop Notification server
+
+Provides a minimal desktop notification server as defined by the [Freedesktop Desktop Notifications Specification](https://specifications.freedesktop.org/notification-spec/notification-spec-latest.html)
+
+A single client command to close notifications is currently implemented.
+For other ways to interact with the server use `notify-send` or `busctl`.
+
+## Window Manager Workspaces
+
+Keeps track of active workspaces. Currently only available for [hyprland](https://github.com/hyprwm/Hyprland)
+
+
+## Feature Wishlist
+Stuff I'll maybe eventually get to (PRs welcome).
+  - SwayWM Workspace support
+  - Send notification command 
+  - Notification "expiration timeout" support.
+
+
 
