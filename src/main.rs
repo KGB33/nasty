@@ -42,6 +42,7 @@ fn main() {
         //Commands::Notification {} => notifications::send_test_note(),
         Commands::Notifications { server, close } => match (server, close) {
             (true, _) => notifications::start_server(),
+            (false, 0) => println!("Unknown usage, see -h."),
             (false, close) => notifications::close_notification(close),
         },
         Commands::Workspaces { wm } => match wm {

@@ -43,11 +43,13 @@ struct Notes {
 
 impl Notes {
     fn new() -> Notes {
-        Notes {
+        let mut n = Notes {
             notifications: HashMap::new(),
             priority: Vec::new(),
             last_id: 1,
-        }
+        };
+        n.on_change();
+        return n;
     }
     fn next_id(&mut self) -> u32 {
         self.last_id += 1;
