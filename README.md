@@ -20,12 +20,22 @@ For other ways to interact with the server use `notify-send` or `busctl`.
 
 Keeps track of active workspaces. Currently only available for [hyprland](https://github.com/hyprwm/Hyprland)
 
+## Weather 
+
+Uses Mozilla Location Services & Weather.Gov to get the current weather
+info (No api keys needed!).
+
+Useful URLs
+  - https://location.services.mozilla.com/v1/geolocate?key=geoclue
+  - [`api.weather.gov` docs](https://www.weather.gov/documentation/services-web-api)
+
 
 ## Feature Wishlist
 Stuff I'll maybe eventually get to (PRs welcome).
   - SwayWM Workspace support
   - Send notification command 
   - Notification "expiration timeout" support.
+  - Run as daemon/systemd service
 
 
 
