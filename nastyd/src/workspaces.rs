@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::io::BufRead;
-use std::net::Shutdown;
 use std::os::unix::net::UnixStream;
 use std::process;
 use std::{env, io::BufReader};
@@ -103,13 +102,6 @@ pub fn hyperland_wm() {
     let mut state = WorkspaceState::new();
     let u_stream = UnixStream::connect(addr).expect("Couldn't connect to the server...");
     let stream = BufReader::new(u_stream.try_clone().expect("Couldn't clone socket"));
-    ctrlc::set_handler(move || {
-        u_stream
-            .shutdown(Shutdown::Read)
-            .expect("shutdown function failed");
-        println!("Closing socket reader.")
-    })
-    .expect("Error setting Ctrl-C handler");
     for line in stream.lines() {
         let line = line.expect("");
         let line = line.split(">>").collect::<Vec<_>>();

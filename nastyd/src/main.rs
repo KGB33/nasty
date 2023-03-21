@@ -1,3 +1,6 @@
+pub mod workspaces;
+pub mod notifications;
+
 use clap::{Parser, ValueEnum};
 
 #[derive(Parser, Debug)]
@@ -17,7 +20,7 @@ fn main() {
     let args = Args::parse();
 
     match args.mode {
-        Modes::Notification => todo!(),
-        Modes::Workspaces => todo!(),
+        Modes::Notification => notifications::start_server(),
+        Modes::Workspaces => workspaces::hyperland_wm(),
     }
 }
