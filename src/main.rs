@@ -1,7 +1,7 @@
 extern crate nasty;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use nasty::{notifications, workspaces};
+use nasty::{notifications, upgrade, workspaces};
 
 /// A listener cli designed to be used with EWW widgets.
 #[derive(Debug, Parser)]
@@ -29,11 +29,23 @@ enum Commands {
         #[arg(default_value_t=WindowManagers::Hyperland, value_enum)]
         wm: WindowManagers,
     },
+
+    #[command()]
+    Updates {
+        /// The Package Manager used
+        #[arg(default_value_t=PackageManagers::Nix, value_enum)]
+        pkg: PackageManagers,
+    },
 }
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 enum WindowManagers {
     Hyperland,
+}
+
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+enum PackageManagers {
+    Nix,
 }
 
 fn main() {
@@ -47,6 +59,9 @@ fn main() {
         },
         Commands::Workspaces { wm } => match wm {
             WindowManagers::Hyperland => workspaces::hyperland_wm(),
+        },
+        Commands::Updates { pkg } => match pkg {
+            PackageManagers::Nix => upgrade::nixos(),
         },
     }
 }
