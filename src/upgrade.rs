@@ -1,17 +1,116 @@
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs};
 
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 /// Prints update information on a NixOS system
 pub fn nixos() {
     let contents = read_lockfile("/etc/nixos/flake.lock");
-    dbg!(contents);
-    unimplemented!()
+    let roots: Vec<&String> = match contents.nodes.get("root") {
+        Some(n) => match n {
+            NodeType::Root { inputs } => inputs.keys().collect(),
+            NodeType::Node { .. } => {println!(r#"[{{'error': 'Unable to find inputs on root node'}}]"#); return},
+        },
+        None => {println!(r#"[{{'error': 'Unable to find root node'}}]"#); return}
+    };
+    let mut updates = HashMap::<String, Update>::new();
+    for (_, node) in contents.nodes.iter().filter(|&(name, _)| roots.contains(&name)) {
+        let (orig, lock) = match node {
+            NodeType::Node {
+                original, locked, ..
+            } => (original, locked),
+            NodeType::Root { .. } => continue,
+        };
+        updates.insert(format!("{}/{}", orig.owner, orig.repo) , check_for_update(lock, orig));
+    }
+    println!(
+        "{}",
+        serde_json::to_string(&updates).unwrap_or("{{\"error\": \"idk man\"}".to_string())
+    );
+}
+
+fn check_for_update(lock: &Locked, orig: &Original) -> Update {
+    let source_url = match url(lock, orig) {
+        Some(u) => u,
+        None => {
+            return Update::Error {
+                error: format!("Unable to generate url for source type '{:?}'.", lock._type),
+            }
+        }
+    };
+    let client = match reqwest::blocking::ClientBuilder::new()
+        .user_agent("KGB33/nasty")
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return Update::Error {
+                error: e.to_string(),
+            }
+        }
+    };
+    let resp = match client.get(source_url).send() {
+        Ok(resp) => resp,
+        Err(e) => {
+            return Update::Error {
+                error: e.to_string(),
+            }
+        }
+    };
+    if resp.status() == StatusCode::FORBIDDEN {
+        // x-ratelimit-reset
+        let ratelimit_reset: i64 = match resp.headers().get("x-ratelimit-reset") {
+            Some(r) => match r.to_str() {
+                Ok(s) => match s.parse::<i64>() {
+                    Ok(i) => i,
+                    Err(e) => {
+                        return Update::Error {
+                            error: e.to_string(),
+                        }
+                    }
+                },
+                Err(e) => {
+                    return Update::Error {
+                        error: e.to_string(),
+                    }
+                }
+            },
+            None => return Update::Error {
+                error:
+                    "You appear to be ratelimited but the 'x-ratelimit-reset' header isn't present."
+                        .to_string(),
+            },
+        };
+        let time_til_unlimited = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as i64;
+        return Update::Error {
+            error: format!(
+                "Rate limited... try again in {}s",
+                ratelimit_reset - time_til_unlimited
+            ),
+        };
+    };
+    match resp.json::<Update>() {
+        Ok(r) => r,
+        Err(e) => Update::Error {
+            error: e.to_string(),
+        },
+    }
 }
 
 fn read_lockfile(path: &str) -> Lockfile {
     let contents = fs::read_to_string(path).expect("Unable to read file");
     serde_json::from_str::<Lockfile>(&contents).expect("Unable to parse file.")
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(untagged)]
+enum Update {
+    Valid { html_url: String, ahead_by: u16 },
+    Error { error: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -71,23 +170,21 @@ enum SourceType {
     GitLab,
 }
 
-impl Original {
-    fn url(&self) -> String {
-        match self._type {
-            SourceType::GitHub => self.github_url(),
-            _ => unimplemented!(),
-        }
+fn url(lock: &Locked, orig: &Original) -> Option<String> {
+    match lock._type {
+        SourceType::GitHub => Some(github_url(lock, orig)),
+        _ => None,
     }
+}
 
-    fn github_url(&self) -> String {
-        match &self._ref {
-            Some(_ref) => format!(
-                "https://api.github.com/repos/{}/{}/branches/{}",
-                self.owner, self.repo, _ref
-            ),
-            None => todo!(),
-        }
-    }
+fn github_url(lock: &Locked, orig: &Original) -> String {
+    // https://api.github.com/repos/{onwer}/{repo}/compare/{}...{_ref/HEAD}
+    // If the _ref isn't incluseed replace with HEAD
+    let _ref = orig._ref.as_deref().unwrap_or("HEAD");
+    format!(
+        "https://api.github.com/repos/{}/{}/compare/{}...{}",
+        orig.owner, orig.repo, lock.rev, _ref
+    )
 }
 
 #[cfg(test)]
@@ -95,17 +192,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn github_url_formats_correctly() {
+    fn github_url_formats_correctly_ref_some() {
         let org = Original {
             owner: "nixos".to_string(),
             _ref: Some("some_ref".to_string()),
             repo: "nixpkgs".to_string(),
             _type: SourceType::GitHub,
         };
-        let expected = "https://api.github.com/repos/nixos/nixpkgs/branches/some_ref".to_string();
-        assert_eq!(org.github_url(), expected);
+        let lock = Locked {
+            last_modified: 12345,
+            nar_hash: "some_hash".to_string(),
+            owner: "nixos".to_string(),
+            repo: "nixpkgs".to_string(),
+            rev: "some_rev".to_string(),
+            _type: SourceType::GitHub,
+        };
+        let expected =
+            "https://api.github.com/repos/nixos/nixpkgs/compare/some_rev...some_ref".to_string();
+        assert_eq!(github_url(lock, org), expected);
     }
 
+    #[test]
+    fn github_url_formats_correctly_ref_none() {
+        let org = Original {
+            owner: "nixos".to_string(),
+            _ref: None,
+            repo: "nixpkgs".to_string(),
+            _type: SourceType::GitHub,
+        };
+        let lock = Locked {
+            last_modified: 12345,
+            nar_hash: "some_hash".to_string(),
+            owner: "nixos".to_string(),
+            repo: "nixpkgs".to_string(),
+            rev: "some_rev".to_string(),
+            _type: SourceType::GitHub,
+        };
+        let expected =
+            "https://api.github.com/repos/nixos/nixpkgs/compare/some_rev...HEAD".to_string();
+        assert_eq!(github_url(lock, org), expected);
+    }
     #[test]
     fn root_inputs_are_parsed_correctly() {
         let expected = HashMap::from([
