@@ -22,11 +22,9 @@ Keeps track of active workspaces. Currently only available for [hyprland](https:
 
 
 ## Feature Wishlist
-Stuff I'll maybe eventually get to (PRs welcome).
-  - SwayWM Workspace support
-  - Send notification command 
+Stuff I'll maybe eventually get to.
   - Notification "expiration timeout" support.
-  - AUR package & CI/CD
+  - Weather/Air quality info
 
 
 
