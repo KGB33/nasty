@@ -26,5 +26,7 @@ Stuff I'll maybe eventually get to.
   - Notification "expiration timeout" support.
   - Weather/Air quality info
 
+# Contributing
 
-
+Clippy fails on `src/dnote/*` due to `clippy::too_many_arguments`. [Zbus PR#
+518](https://github.com/dbus2/zbus/pull/518).

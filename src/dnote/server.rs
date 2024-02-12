@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use zbus::{
-    dbus_interface,
+    interface,
     zvariant::{DeserializeDict, SerializeDict, Type},
     Connection,
 };
@@ -49,11 +49,11 @@ impl Notes {
             last_id: 1,
         };
         n.on_change();
-        return n;
+        n
     }
     fn next_id(&mut self) -> u32 {
         self.last_id += 1;
-        return self.last_id;
+        self.last_id
     }
     fn on_change(&mut self) {
         self.update_urgency();
@@ -65,13 +65,13 @@ impl Notes {
         self.priority.sort_by_key(|k| {
             (
                 10 - self.notifications.get(k).unwrap().hints.urgency.unwrap(),
-                k.clone(),
+                *k,
             )
         });
     }
 }
 
-#[dbus_interface(name = "org.freedesktop.Notifications")]
+#[interface(name = "org.freedesktop.Notifications")]
 impl Notes {
     // CloseNotification method
     async fn close_notification(&mut self, id: u32) {
@@ -96,10 +96,10 @@ impl Notes {
     }
 
     // GetServerInformation method
-    #[dbus_interface(out_args("name", "vendor", "version", "spec_version"))]
-    async fn get_server_information(&self) -> zbus::fdo::Result<(&str, &str, &str, &str)> {
-        return Ok(("dnote", "kgb33", "v0.0.0", "1.2"));
-    }
+    // #[interface(out_args("name", "vendor", "version", "spec_version"))]
+    // async fn get_server_information(&self) -> zbus::fdo::Result<(&str, &str, &str, &str)> {
+    //     Ok(("dnote", "kgb33", "v0.0.0", "1.2"))
+    // }
 
     // Notify method
     async fn notify(
@@ -129,11 +129,11 @@ impl Notes {
             },
         );
         self.on_change();
-        return replaces_id;
+        replaces_id
     }
 
     // ActionInvoked signal
-    //#[dbus_proxy(signal)]
+    //#[zbus(signal)]
     //fn action_invoked(&self, id: u32, action_key: &str) -> zbus::Result<()>;
 
     // NotificationClosed signal

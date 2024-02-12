@@ -1,3 +1,4 @@
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{collections::HashMap, fs};
 
@@ -6,61 +7,153 @@ use serde::{Deserialize, Serialize};
 
 /// Prints update information on a NixOS system
 pub fn nixos() {
+    // Read Nix lockfile
     let contents = read_lockfile("/etc/nixos/flake.lock");
     let roots: Vec<&String> = match contents.nodes.get("root") {
         Some(n) => match n {
             NodeType::Root { inputs } => inputs.keys().collect(),
-            NodeType::Node { .. } => {println!(r#"[{{'error': 'Unable to find inputs on root node'}}]"#); return},
+            NodeType::Node { .. } => {
+                println!(r#"[{{'error': 'Unable to find inputs on root node'}}]"#);
+                return;
+            }
         },
-        None => {println!(r#"[{{'error': 'Unable to find root node'}}]"#); return}
+        None => {
+            println!(r#"[{{'error': 'Unable to find root node'}}]"#);
+            return;
+        }
     };
+
+    // Check for updates
     let mut updates = HashMap::<String, Update>::new();
-    for (_, node) in contents.nodes.iter().filter(|&(name, _)| roots.contains(&name)) {
+    for (_, node) in contents
+        .nodes
+        .iter()
+        .filter(|&(name, _)| roots.contains(&name))
+    {
         let (orig, lock) = match node {
             NodeType::Node {
                 original, locked, ..
             } => (original, locked),
             NodeType::Root { .. } => continue,
         };
-        updates.insert(format!("{}/{}", orig.owner, orig.repo) , check_for_update(lock, orig));
+        let checker = checker_factory(lock, orig);
+        updates.insert(format!("{}/{}", orig.owner, orig.repo), checker.check());
     }
+
+    // Display Updates
     println!(
         "{}",
         serde_json::to_string(&updates).unwrap_or("{{\"error\": \"idk man\"}".to_string())
     );
 }
 
-fn check_for_update(lock: &Locked, orig: &Original) -> Update {
-    let source_url = match url(lock, orig) {
-        Some(u) => u,
-        None => {
-            return Update::Error {
-                error: format!("Unable to generate url for source type '{:?}'.", lock._type),
-            }
+trait Checker {
+    fn check(&self) -> Update;
+}
+
+fn checker_factory<'a>(lock: &'a Locked, orig: &'a Original) -> impl Checker + 'a {
+    match lock._type {
+        SourceType::GitHub => Github {
+            use_cli: Github::gh_cli_is_ready(),
+            lock,
+            orig,
+        },
+        _ => panic!("No Checker avalable for {:?}", lock._type),
+    }
+}
+
+struct Github<'a> {
+    use_cli: bool,
+    lock: &'a Locked,
+    orig: &'a Original,
+}
+
+impl Checker for Github<'_> {
+    fn check(&self) -> Update {
+        if self.use_cli {
+            return self.check_using_cli();
         }
-    };
-    let client = match reqwest::blocking::ClientBuilder::new()
-        .user_agent("KGB33/nasty")
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            return Update::Error {
-                error: e.to_string(),
+        self.check_using_http()
+    }
+}
+
+impl Github<'_> {
+    /// Checks to see if the GitHub CLI is prestent and authenticated.
+    fn gh_cli_is_ready() -> bool {
+        let mut cmd = Command::new("gh");
+        let cmd = cmd.arg("auth").arg("status");
+        let output = match cmd.output() {
+            Ok(o) => o,
+            Err(_) => return false, // GH CLI isn't callable
+        };
+        output.status.code() == Some(0)
+    }
+
+    fn generate_enpoint(&self) -> String {
+        // /repos/{onwer}/{repo}/compare/{}...{_ref/HEAD}
+        // If the _ref isn't incluseed replace with HEAD
+        let _ref = self.orig._ref.as_deref().unwrap_or("HEAD");
+        format!(
+            "repos/{}/{}/compare/{}...{}",
+            self.orig.owner, self.orig.repo, self.lock.rev, _ref
+        )
+    }
+
+    fn check_using_cli(&self) -> Update {
+        let endpoint = self.generate_enpoint();
+        let mut cmd = Command::new("gh");
+        let cmd = cmd.arg("api").arg(endpoint);
+        let out = match cmd.output() {
+            Ok(o) => o,
+            Err(e) => {
+                return Update::Error {
+                    error: e.to_string(),
+                }
             }
-        }
-    };
-    let resp = match client.get(source_url).send() {
-        Ok(resp) => resp,
-        Err(e) => {
+        };
+        if out.status.code() != Some(0) {
             return Update::Error {
-                error: e.to_string(),
+                error: String::from_utf8(out.stderr)
+                    .unwrap_or("Command failed, and unwrapping srderr failled too!".to_string()),
+            };
+        };
+        let response = match String::from_utf8(out.stdout) {
+            Ok(r) => r,
+            Err(e) => {
+                return Update::Error {
+                    error: e.to_string(),
+                }
             }
-        }
-    };
-    if resp.status() == StatusCode::FORBIDDEN {
-        // x-ratelimit-reset
-        let ratelimit_reset: i64 = match resp.headers().get("x-ratelimit-reset") {
+        };
+        serde_json::from_str::<Update>(&response).unwrap_or(Update::Error {
+            error: String::from("Falled to parse response to json."),
+        })
+    }
+
+    fn check_using_http(&self) -> Update {
+        let source_url = format!("https://api.github.com/{}", self.generate_enpoint());
+        let client = match reqwest::blocking::ClientBuilder::new()
+            .user_agent("KGB33/nasty")
+            .build()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                return Update::Error {
+                    error: e.to_string(),
+                }
+            }
+        };
+        let resp = match client.get(source_url).send() {
+            Ok(resp) => resp,
+            Err(e) => {
+                return Update::Error {
+                    error: e.to_string(),
+                }
+            }
+        };
+        if resp.status() == StatusCode::FORBIDDEN {
+            // x-ratelimit-reset
+            let ratelimit_reset: i64 = match resp.headers().get("x-ratelimit-reset") {
             Some(r) => match r.to_str() {
                 Ok(s) => match s.parse::<i64>() {
                     Ok(i) => i,
@@ -82,22 +175,23 @@ fn check_for_update(lock: &Locked, orig: &Original) -> Update {
                         .to_string(),
             },
         };
-        let time_til_unlimited = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs() as i64;
-        return Update::Error {
-            error: format!(
-                "Rate limited... try again in {}s",
-                ratelimit_reset - time_til_unlimited
-            ),
+            let time_til_unlimited = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs() as i64;
+            return Update::Error {
+                error: format!(
+                    "Rate limited... try again in {}s",
+                    ratelimit_reset - time_til_unlimited
+                ),
+            };
         };
-    };
-    match resp.json::<Update>() {
-        Ok(r) => r,
-        Err(e) => Update::Error {
-            error: e.to_string(),
-        },
+        match resp.json::<Update>() {
+            Ok(r) => r,
+            Err(e) => Update::Error {
+                error: e.to_string(),
+            },
+        }
     }
 }
 
@@ -170,36 +264,19 @@ enum SourceType {
     GitLab,
 }
 
-fn url(lock: &Locked, orig: &Original) -> Option<String> {
-    match lock._type {
-        SourceType::GitHub => Some(github_url(lock, orig)),
-        _ => None,
-    }
-}
-
-fn github_url(lock: &Locked, orig: &Original) -> String {
-    // https://api.github.com/repos/{onwer}/{repo}/compare/{}...{_ref/HEAD}
-    // If the _ref isn't incluseed replace with HEAD
-    let _ref = orig._ref.as_deref().unwrap_or("HEAD");
-    format!(
-        "https://api.github.com/repos/{}/{}/compare/{}...{}",
-        orig.owner, orig.repo, lock.rev, _ref
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn github_url_formats_correctly_ref_some() {
-        let org = Original {
+        let orig = &Original {
             owner: "nixos".to_string(),
             _ref: Some("some_ref".to_string()),
             repo: "nixpkgs".to_string(),
             _type: SourceType::GitHub,
         };
-        let lock = Locked {
+        let lock = &Locked {
             last_modified: 12345,
             nar_hash: "some_hash".to_string(),
             owner: "nixos".to_string(),
@@ -207,20 +284,24 @@ mod tests {
             rev: "some_rev".to_string(),
             _type: SourceType::GitHub,
         };
-        let expected =
-            "https://api.github.com/repos/nixos/nixpkgs/compare/some_rev...some_ref".to_string();
-        assert_eq!(github_url(lock, org), expected);
+        let gh = Github {
+            use_cli: false,
+            lock,
+            orig,
+        };
+        let expected = "repos/nixos/nixpkgs/compare/some_rev...some_ref".to_string();
+        assert_eq!(gh.generate_enpoint(), expected);
     }
 
     #[test]
     fn github_url_formats_correctly_ref_none() {
-        let org = Original {
+        let orig = &Original {
             owner: "nixos".to_string(),
             _ref: None,
             repo: "nixpkgs".to_string(),
             _type: SourceType::GitHub,
         };
-        let lock = Locked {
+        let lock = &Locked {
             last_modified: 12345,
             nar_hash: "some_hash".to_string(),
             owner: "nixos".to_string(),
@@ -228,9 +309,13 @@ mod tests {
             rev: "some_rev".to_string(),
             _type: SourceType::GitHub,
         };
-        let expected =
-            "https://api.github.com/repos/nixos/nixpkgs/compare/some_rev...HEAD".to_string();
-        assert_eq!(github_url(lock, org), expected);
+        let gh = Github {
+            use_cli: false,
+            lock,
+            orig,
+        };
+        let expected = "repos/nixos/nixpkgs/compare/some_rev...HEAD".to_string();
+        assert_eq!(gh.generate_enpoint(), expected);
     }
     #[test]
     fn root_inputs_are_parsed_correctly() {
