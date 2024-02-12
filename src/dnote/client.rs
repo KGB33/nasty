@@ -2,7 +2,7 @@ use zbus::dbus_proxy;
 use zbus::Connection;
 
 // DBus interface proxy for: `org.freedesktop.Notifications`
-#[dbus_proxy(interface = "org.freedesktop.Notifications")]
+#[dbus_proxy(interface = "org.freedesktop.Notifications", assume_defaults = true)]
 trait Notifications {
     /// CloseNotification method
     fn close_notification(&self, id: u32) -> zbus::Result<()>;
@@ -66,6 +66,5 @@ pub async fn notify(
 pub async fn close_notification(id: u32) {
     let connection = Connection::session().await.expect("");
     let note = NotificationsProxy::new(&connection).await.expect("");
-    let reply = note.close_notification(id).await.expect("");
-    dbg!(reply);
+    note.close_notification(id).await.expect("");
 }

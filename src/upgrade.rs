@@ -37,10 +37,7 @@ pub fn nixos() {
             NodeType::Root { .. } => continue,
         };
         let checker = checker_factory(lock, orig);
-        updates.insert(
-            format!("{}/{}", orig.owner, orig.repo),
-            checker.check(),
-        );
+        updates.insert(format!("{}/{}", orig.owner, orig.repo), checker.check());
     }
 
     // Display Updates
@@ -56,13 +53,11 @@ trait Checker {
 
 fn checker_factory<'a>(lock: &'a Locked, orig: &'a Original) -> impl Checker + 'a {
     match lock._type {
-        SourceType::GitHub => {
-            return Github {
-                use_cli: Github::gh_cli_is_ready(),
-                lock,
-                orig,
-            }
-        }
+        SourceType::GitHub => Github {
+            use_cli: Github::gh_cli_is_ready(),
+            lock,
+            orig,
+        },
         _ => panic!("No Checker avalable for {:?}", lock._type),
     }
 }
@@ -78,7 +73,7 @@ impl Checker for Github<'_> {
         if self.use_cli {
             return self.check_using_cli();
         }
-        return self.check_using_http();
+        self.check_using_http()
     }
 }
 
@@ -91,7 +86,7 @@ impl Github<'_> {
             Ok(o) => o,
             Err(_) => return false, // GH CLI isn't callable
         };
-        return output.status.code() == Some(0);
+        output.status.code() == Some(0)
     }
 
     fn generate_enpoint(&self) -> String {
@@ -287,9 +282,12 @@ mod tests {
             rev: "some_rev".to_string(),
             _type: SourceType::GitHub,
         };
-        let gh = Github {use_cli: false, lock, orig};
-        let expected =
-            "repos/nixos/nixpkgs/compare/some_rev...HEAD".to_string();
+        let gh = Github {
+            use_cli: false,
+            lock,
+            orig,
+        };
+        let expected = "repos/nixos/nixpkgs/compare/some_rev...HEAD".to_string();
         assert_eq!(gh.generate_enpoint(), expected);
     }
     #[test]

@@ -67,33 +67,30 @@ impl WorkspaceState {
     fn update(&mut self, opcode: String, value: String) -> bool {
         match opcode.as_str() {
             "workspace" => {
-                self.active_workspace =
-                    u8::from_str_radix(&value, 10).expect("err converting to int.");
-                return true;
+                self.active_workspace = value.parse().expect("err converting to int.");
+                true
             }
             "createworkspace" => {
-                let value = u8::from_str_radix(&value, 10).expect("err converting to int.");
+                let value = value.parse::<u8>().expect("err converting to int.");
                 self.wss.insert(value, String::new());
                 self.ws_names = self.wss.to_owned().into_keys().collect();
-                return true;
+                true
             }
             "destroyworkspace" => {
-                let value = u8::from_str_radix(&value, 10).expect("err converting to int.");
+                let value = value.parse::<u8>().expect("err converting to int.");
                 self.wss.remove(&value);
                 self.ws_names = self.wss.to_owned().into_keys().collect();
-                return true;
+                true
             }
             "activewindow" => {
                 if value != "," {
-                    let value = value.split(",").collect::<Vec<_>>();
+                    let value = value.split(',').collect::<Vec<_>>();
                     self.wss.insert(self.active_workspace, value[1].to_string());
                     return true;
                 }
-                return false;
+                false
             }
-            _ => {
-                return false;
-            }
+            _ => false,
         }
     }
 }
