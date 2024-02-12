@@ -1,8 +1,8 @@
-use zbus::dbus_proxy;
+use zbus::proxy;
 use zbus::Connection;
 
 // DBus interface proxy for: `org.freedesktop.Notifications`
-#[dbus_proxy(interface = "org.freedesktop.Notifications", assume_defaults = true)]
+#[proxy(interface = "org.freedesktop.Notifications", assume_defaults = true)]
 trait Notifications {
     /// CloseNotification method
     fn close_notification(&self, id: u32) -> zbus::Result<()>;
@@ -27,11 +27,11 @@ trait Notifications {
     ) -> zbus::Result<u32>;
 
     /// ActionInvoked signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn action_invoked(&self, id: u32, action_key: &str) -> zbus::Result<()>;
 
     /// NotificationClosed signal
-    #[dbus_proxy(signal)]
+    #[zbus(signal)]
     fn notification_closed(&self, id: u32, reason: u32) -> zbus::Result<()>;
 }
 
