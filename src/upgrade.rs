@@ -100,7 +100,34 @@ impl Github<'_> {
     }
 
     fn check_using_cli(&self) -> Update {
-        todo!();
+        let endpoint = self.generate_enpoint();
+        let mut cmd = Command::new("gh");
+        let cmd = cmd.arg("api").arg(endpoint);
+        let out = match cmd.output() {
+            Ok(o) => o,
+            Err(e) => {
+                return Update::Error {
+                    error: e.to_string(),
+                }
+            }
+        };
+        if out.status.code() != Some(0) {
+            return Update::Error {
+                error: String::from_utf8(out.stderr)
+                    .unwrap_or("Command failed, and unwrapping srderr failled too!".to_string()),
+            };
+        };
+        let response = match String::from_utf8(out.stdout) {
+            Ok(r) => r,
+            Err(e) => {
+                return Update::Error {
+                    error: e.to_string(),
+                }
+            }
+        };
+        serde_json::from_str::<Update>(&response).unwrap_or(Update::Error {
+            error: String::from("Falled to parse response to json."),
+        })
     }
 
     fn check_using_http(&self) -> Update {
