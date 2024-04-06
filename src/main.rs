@@ -35,6 +35,9 @@ enum Commands {
         /// The Package Manager used
         #[arg(default_value_t=PackageManagers::Nix, value_enum)]
         pkg: PackageManagers,
+
+        #[arg(short, long, default_value_t=String::from("/etc/nixos/flake.lock"))]
+        lock_file: String,
     },
 }
 
@@ -60,8 +63,8 @@ fn main() {
         Commands::Workspaces { wm } => match wm {
             WindowManagers::Hyperland => workspaces::hyperland_wm(),
         },
-        Commands::Updates { pkg } => match pkg {
-            PackageManagers::Nix => upgrade::nixos(),
+        Commands::Updates { pkg, lock_file } => match pkg {
+            PackageManagers::Nix => upgrade::nixos(&lock_file),
         },
     }
 }
