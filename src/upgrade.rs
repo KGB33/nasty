@@ -6,9 +6,9 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 /// Prints update information on a NixOS system
-pub fn nixos() {
+pub fn nixos(file_path: &str) {
     // Read Nix lockfile
-    let contents = read_lockfile("/etc/nixos/flake.lock");
+    let contents = read_lockfile(file_path);
     let roots: Vec<&String> = match contents.nodes.get("root") {
         Some(n) => match n {
             NodeType::Root { inputs } => inputs.keys().collect(),
