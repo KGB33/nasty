@@ -95,7 +95,7 @@ impl WorkspaceState {
     }
 }
 pub fn listen_and_print() {
-    let hypr_id = env::var("HYPRLAND_INSTANCE_SIGNATURE").expect("Is Hyperland running?");
+    let hypr_id = env::var("HYPRLAND_INSTANCE_SIGNATURE").expect("Is Hyprland running?");
     let addr = format!("/tmp/hypr/{hypr_id}/.socket2.sock");
     let mut state = WorkspaceState::new();
     let u_stream = UnixStream::connect(addr).expect("Couldn't connect to the server...");

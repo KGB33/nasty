@@ -26,7 +26,7 @@ enum Commands {
     #[command()]
     Workspaces {
         /// The WM being used.
-        #[arg(default_value_t=WindowManagers::Hyperland, value_enum)]
+        #[arg(default_value_t=WindowManagers::Hyprland, value_enum)]
         wm: WindowManagers,
     },
 
@@ -62,7 +62,7 @@ fn main() {
             (false, close) => notifications::close_notification(close),
         },
         Commands::Workspaces { wm } => match wm {
-            WindowManagers::Hyperland => workspaces::hyprland::listen_and_print(),
+            WindowManagers::Hyprland => workspaces::hyprland::listen_and_print(),
             WindowManagers::Sway => workspaces::sway::listen_and_print(),
         },
         Commands::Updates { pkg, lock_file } => match pkg {
