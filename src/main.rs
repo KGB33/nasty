@@ -43,7 +43,8 @@ enum Commands {
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
 enum WindowManagers {
-    Hyperland,
+    Hyprland,
+    Sway,
 }
 
 #[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
@@ -61,7 +62,8 @@ fn main() {
             (false, close) => notifications::close_notification(close),
         },
         Commands::Workspaces { wm } => match wm {
-            WindowManagers::Hyperland => workspaces::hyperland_wm(),
+            WindowManagers::Hyperland => workspaces::hyprland::listen_and_print(),
+            WindowManagers::Sway => workspaces::sway::listen_and_print(),
         },
         Commands::Updates { pkg, lock_file } => match pkg {
             PackageManagers::Nix => upgrade::nixos(&lock_file),
