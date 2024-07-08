@@ -1,7 +1,7 @@
 // Internal, standarized, representation of multiple
 // Window managers' workspaces.
 
-use std::{collections::BTreeSet};
+use std::collections::BTreeSet;
 
 use serde::Serialize;
 
