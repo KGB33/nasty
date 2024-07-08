@@ -2,29 +2,32 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay = {
-      url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
-    };
+    cargo2nix.url = "github:cargo2nix/cargo2nix/release-0.11.0";
   };
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
+  outputs = { self, nixpkgs, flake-utils, cargo2nix }:
     flake-utils.lib.eachDefaultSystem
       (system:
         let
-          overlays = [ (import rust-overlay) ];
           pkgs = import nixpkgs {
-            inherit system overlays;
+            inherit system;
+            overlays = [ cargo2nix.overlays.default ];
+          };
+          rustPkgs = pkgs.rustBuilder.makePackageSet {
+            rustVersion = "latest";
+            packageFun = import ./Cargo.nix;
           };
         in
-        with pkgs;
+        rec
         {
-          devShells.default = mkShell {
-            buildInputs = [ rust-bin.stable.latest.default pkgs.openssl pkgs.pkg-config pkgs.jaq ];
+          packages = {
+            nasty = (rustPkgs.workspace.nasty { });
+            default = packages.nasty;
+
+          };
+          devShells.default = with pkgs; mkShell {
+            buildInputs = [ rust-bin.stable.latest.default openssl pkg-config jaq ];
           };
         }
-      
+
       );
 }
