@@ -1,11 +1,8 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use zbus::{
-    interface,
-    zvariant::{DeserializeDict, SerializeDict, Type},
-    Connection,
-};
+use zbus::{interface, Connection};
+use zvariant::{DeserializeDict, SerializeDict, Type};
 
 #[derive(Serialize, Deserialize)]
 struct Notification {
