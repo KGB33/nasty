@@ -2,32 +2,47 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    cargo2nix.url = "github:cargo2nix/cargo2nix/release-0.11.0";
+    crane = {
+      url = "github:ipetkov/crane";
+            #inputs.nixpkgs.follows = "nixpkgs";
+    };
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
-  outputs = { self, nixpkgs, flake-utils, cargo2nix }:
+  outputs = {
+    self,
+    crane,
+    flake-utils,
+    nixpkgs,
+    rust-overlay,
+  }:
     flake-utils.lib.eachDefaultSystem
-      (system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ cargo2nix.overlays.default ];
+    (
+      system: let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [(import rust-overlay)];
+        };
+        craneLib =
+          (crane.mkLib pkgs).overrideToolchain (p:
+            pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml);
+      in rec
+      {
+        packages = {
+          nasty = craneLib.buildPackage {
+            src = craneLib.cleanCargoSource ./.;
+            nativeBuildInputs = with pkgs; [pkg-config openssl];
           };
-          rustPkgs = pkgs.rustBuilder.makePackageSet {
-            rustVersion = "latest";
-            packageFun = import ./Cargo.nix;
+          default = packages.nasty;
+        };
+        devShells = {
+          default = craneLib.devShell {
+            inputsFrom = [packages.default];
+            packages = with pkgs; [rust-analyzer jq];
           };
-        in
-        rec
-        {
-          packages = {
-            nasty = (rustPkgs.workspace.nasty { });
-            default = packages.nasty;
-
-          };
-          devShells.default = with pkgs; mkShell {
-            buildInputs = [ rust-bin.stable.latest.default openssl pkg-config jaq ];
-          };
-        }
-
-      );
+        };
+      }
+    );
 }
