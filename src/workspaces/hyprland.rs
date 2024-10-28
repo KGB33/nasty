@@ -12,7 +12,7 @@ fn _listen_and_print(stream: BufReader<UnixStream>) {
             continue;
         };
         let content = msg.split(">>").collect::<Vec<_>>();
-        let [opcode, id, _] = content[..] else {
+        let [opcode, id] = content[..] else {
             continue;
         };
         let id = id.parse::<i64>().unwrap_or(0);
@@ -35,7 +35,11 @@ fn _listen_and_print(stream: BufReader<UnixStream>) {
 }
 pub fn listen_and_print() {
     let hypr_id = env::var("HYPRLAND_INSTANCE_SIGNATURE").expect("Is Hyprland running?");
-    let addr = format!("/tmp/hypr/{hypr_id}/.socket2.sock");
+    let runtime_dir = env::var("XDG_RUNTIME_DIR").unwrap_or_else(|_| {
+        let uid = env::var("UID").unwrap_or("1000".into());
+        format!("/run/user/{uid}")
+    });
+    let addr = format!("{runtime_dir}/hypr/{hypr_id}/.socket2.sock");
     let u_stream = UnixStream::connect(addr).expect("Couldn't connect to the server...");
     let stream = BufReader::new(u_stream.try_clone().expect("Couldn't clone socket"));
     ctrlc::set_handler(move || {
