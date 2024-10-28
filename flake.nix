@@ -40,7 +40,7 @@
         devShells = {
           default = craneLib.devShell {
             inputsFrom = [packages.default];
-            packages = with pkgs; [rust-analyzer jq];
+            packages = with pkgs; [rust-analyzer jq cargo-edit];
           };
         };
       }
